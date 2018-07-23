@@ -8,6 +8,15 @@ mod brush;
 
 //https://www.evl.uic.edu/kreda/gpu/image-convolution/
 
+//opengl 离屏渲染上下文初始化
+//https://yq.aliyun.com/articles/57375
+
+//离屏渲染 核心代码
+//https://www.cnblogs.com/hrlnw/p/4642272.html
+
+//https://crates.io/crates/gl
+//https://github.com/brendanzab/gl-rs/
+//https://crates.io/crates/gl_generator
 
 use piston_window::*;
 
