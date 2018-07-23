@@ -6,6 +6,9 @@ mod polygon;
 mod drawing;
 mod brush;
 
+//https://www.evl.uic.edu/kreda/gpu/image-convolution/
+
+
 use piston_window::*;
 
 const DRAWING_ADD_POLYGON_MUTATION_RATE:i32 = 700;
