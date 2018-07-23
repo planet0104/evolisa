@@ -1,0 +1,8 @@
+[package]
+name = "evolisa"
+version = "0.1.0"
+authors = ["planet0104 <planet0104@gmail.com>"]
+
+[dependencies]
+piston_window = "*"
+rand = "*"
