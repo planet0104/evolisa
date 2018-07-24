@@ -1,8 +1,7 @@
-use ::drawing::DnaDrawing;
-use std::cell::RefCell;
-use std::rc::Rc;
 use rand::rngs::ThreadRng;
 use rand::Rng;
+use sdl2::pixels::Color;
+
 use ::{
     BRUSH_ALPHA_MUTATION_RATE,
     BRUSH_ALPHA_RANGE_MIN,
@@ -19,55 +18,46 @@ use ::{
 };
 
 pub struct DnaBrush{
-    pub parent: Rc<RefCell<DnaDrawing>>,
-    r: u8,
-    g: u8,
-    b: u8,
-    a: u8
+    pub color: Color,
 }
 
 impl DnaBrush{
-    pub fn new(parent: Rc<RefCell<DnaDrawing>>) -> DnaBrush{
+    pub fn new() -> DnaBrush{
         DnaBrush{
-            parent,
-            r: 0,
-            g: 0,
-            b: 0,
-            a: 0
+            color: Color::RGBA(0, 0, 0, 0)
         }
     }
 
-    pub fn mutate(&mut self, rng:&mut ThreadRng){
+    pub fn mutate(&mut self, rng:&mut ThreadRng) -> bool{
+        let mut dirty = false;
         if rng.gen_range(0, BRUSH_RED_MUTATION_RATE)==1{
-            self.r = rng.gen_range(BRUSH_RED_RANGE_MIN, BRUSH_RED_RANGE_MAX);
-            self.parent.borrow_mut().dirty = true;
+            self.color.r = rng.gen_range(BRUSH_RED_RANGE_MIN, BRUSH_RED_RANGE_MAX);
+            dirty = true;
         }
 
         if rng.gen_range(0, BRUSH_GREEN_MUTATION_RATE)==1{
-            self.g = rng.gen_range(BRUSH_GREEN_RANGE_MIN, BRUSH_GREEN_RANGE_MAX);
-            self.parent.borrow_mut().dirty = true;
+            self.color.g = rng.gen_range(BRUSH_GREEN_RANGE_MIN, BRUSH_GREEN_RANGE_MAX);
+            dirty = true;
         }
 
         if rng.gen_range(0, BRUSH_BLUE_MUTATION_RATE)==1{
-            self.b = rng.gen_range(BRUSH_BLUE_RANGE_MIN, BRUSH_BLUE_RANGE_MAX);
-            self.parent.borrow_mut().dirty = true;
+            self.color.b = rng.gen_range(BRUSH_BLUE_RANGE_MIN, BRUSH_BLUE_RANGE_MAX);
+            dirty = true;
         }
 
         if rng.gen_range(0, BRUSH_ALPHA_MUTATION_RATE)==1{
-            self.a = rng.gen_range(BRUSH_ALPHA_RANGE_MIN, BRUSH_ALPHA_RANGE_MAX);
-            self.parent.borrow_mut().dirty = true;
+            self.color.a = rng.gen_range(BRUSH_ALPHA_RANGE_MIN, BRUSH_ALPHA_RANGE_MAX);
+            dirty = true;
         }
+
+        dirty
     }
 }
 
 impl Clone for DnaBrush{
     fn clone(&self) -> DnaBrush{
         DnaBrush{
-            parent: self.parent.clone(),
-            r: self.r,
-            g: self.g,
-            b: self.b,
-            a: self.a
+            color: self.color
         }
     }
 }

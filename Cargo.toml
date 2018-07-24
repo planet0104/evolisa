@@ -4,5 +4,12 @@ version = "0.1.0"
 authors = ["planet0104 <planet0104@gmail.com>"]
 
 [dependencies]
-piston_window = "*"
 rand = "*"
+
+[dependencies.sdl2]
+version = "0.31.0"
+features = ["bundled", "static-link", "gfx"]
+
+[profile.release]
+lto = true
+panic = 'abort'
