@@ -5,6 +5,7 @@ authors = ["planet0104 <planet0104@gmail.com>"]
 
 [dependencies]
 rand = "*"
+image = "0.19.0"
 
 [dependencies.sdl2]
 version = "0.31.0"

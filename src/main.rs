@@ -1,19 +1,19 @@
 //#![no_main]
 extern crate sdl2;
 extern crate rand;
+extern crate image;
 
-use sdl2::pixels::Color;
-use sdl2::pixels::PixelFormatEnum;
 use sdl2::surface::Surface;
+use sdl2::pixels::PixelFormatEnum;
+use sdl2::pixels::Color;
 use sdl2::rect::Rect;
-use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
-use sdl2::gfx::primitives::DrawRenderer;
+use std::path::Path;
 
-mod point;
 mod polygon;
 mod drawing;
-mod brush;
+mod painter;
+
+use painter::{Painter, Params};
 
 //opengl库
 /*
@@ -56,42 +56,50 @@ panic = 'abort'
 
 */
 
+//源码 https://github.com/jhrdt/evolisa.js
 
-const DRAWING_ADD_POLYGON_MUTATION_RATE:i32 = 700;
-const DRAWING_REMOVE_POLYGON_MUTATION_RATE:i32 = 1500;
-const DRAWING_POLYGONS_MIN:i32 = 1;
-const DRAWING_POLYGONS_MAX:i32 = 255;
-const DRAWING_POINTS_MIN:i32 = 3;
-const DRAWING_POINTS_MAX:i32 = 255;
+fn main(){
 
-const POLYGON_ADD_POINT_MUTATION_RATE:i32 = 1500;
-const POLYGON_MOVE_POINT_MUTATION_RATE:i32 = 1500;
-const POLYGON_REMOVE_POINT_MUTATION_RATE:i32 = 1500;
-const POLYGON_POINTS_PER_POLYGON_MIN:i32 = 3;
-const POLYGON_POINTS_PER_POLYGON_MAX:i32 = 10;
+    offscreen_test();
 
-const POINT_MOVE_POINT_MUTATION_RATE:i32 = 1500;
-const POINT_MOVE_POINT_MIN_MUTATION_RATE:i32 = 1500;
-const POINT_MOVE_POINT_MID_MUTATION_RATE:i32 = 1500;
-const POINT_MOVE_POINT_MAX_MUTATION_RATE:i32 = 1500;
-const POINT_MOVE_POINT_RANGE_MIN:i32 = 3;
-const POINT_MOVE_POINT_RANGE_MID:i32 = 20;
+    //60个半透明多边形
+    // println!("start..");
+    // let params = Params{
+    //     width: 120,
+    //     height: 145,
+    //     num_elite: 2,
+    //     num_copies_elite: 2,
+    //     polygons_num: 60, //多边形数量
+    //     vertex_num_range: 3..10, //多边形顶点数量 3~10
+    //     mutation_rate: 0.007, //变异率 0.007
+    //     crossover_rate: 0.7, //杂交率 0.7
+    //     vertex_move_range: [200, 20, 3], //顶点移动范围类型(值越小的概率越高) [0~200; 0~20; 0~3]
+    //     alpha_range: 30..=60, //颜色取值范围
+    //     red_range: 0..=255,
+    //     green_range: 0..=255,
+    //     blue_range: 0..=255,
+    // };
+    // println!("params..");
 
-const BRUSH_ALPHA_MUTATION_RATE:i32 = 1500;
-const BRUSH_ALPHA_RANGE_MIN:u8 = 30;
-const BRUSH_ALPHA_RANGE_MAX:u8 = 60;
-const BRUSH_RED_MUTATION_RATE:i32 = 1500;
-const BRUSH_RED_RANGE_MIN:u8 = 0;
-const BRUSH_RED_RANGE_MAX:u8 = 255;
-const BRUSH_GREEN_MUTATION_RATE:i32 = 1500;
-const BRUSH_GREEN_RANGE_MIN:u8 = 0;
-const BRUSH_GREEN_RANGE_MAX:u8 = 255;
-const BRUSH_BLUE_MUTATION_RATE:i32 = 1500;
-const BRUSH_BLUE_RANGE_MIN:u8 = 0;
-const BRUSH_BLUE_RANGE_MAX:u8 = 255;
+    // let mut painter = Painter::new(20, "girl.jpg", params);
 
+    // println!("new ok.");
+
+    // painter.epoch();
+
+    // println!("OK.");
+}
+
+
+#[no_mangle]
+#[allow(non_snake_case)]
+pub extern fn WinMain() -> i32 {
+    main();
+    0
+}
 
 fn offscreen_test(){
+
     let surface = Surface::new(100, 100, PixelFormatEnum::RGB24).unwrap();
 
     let mut canvas = surface.into_canvas().unwrap();
@@ -117,73 +125,7 @@ fn offscreen_test(){
     canvas.present();
 
     println!("{:?}", canvas.output_size());
-    println!("{:?}", canvas.logical_size());
 
     //let image = canvas.read_pixels(Rect::new(0, 0, 512, 512), PixelFormatEnum::RGB888).unwrap();
     canvas.surface().save_bmp("test.bmp").unwrap();
-}
-
-//源码 https://github.com/jhrdt/evolisa.js
-
-fn main(){
-
-    offscreen_test();
-    return;
-
-    let sdl_context = sdl2::init().unwrap();
-    let video_subsystem = sdl_context.video().unwrap();
-
-    let window = video_subsystem
-        .window("evolisa", 800, 600)
-        .resizable()
-        .build()
-        .unwrap();
-
-    let mut canvas = window.into_canvas().present_vsync().build().unwrap();
-
-    let mut tick = 0;
-
-    let mut event_pump = sdl_context.event_pump().unwrap();
-
-    'running: loop {
-        for event in event_pump.poll_iter() {
-            match event {
-                Event::Quit { .. } |
-                Event::KeyDown { keycode: Some(Keycode::Escape), .. } => break 'running,
-                _ => {}
-            }
-        }
-
-        {
-            // Update the window title.
-            let window = canvas.window_mut();
-
-            let position = window.position();
-            let size = window.size();
-            let title = format!("Window - pos({}x{}), size({}x{}): {}",
-                                position.0,
-                                position.1,
-                                size.0,
-                                size.1,
-                                tick);
-            window.set_title(&title).unwrap();
-
-            tick += 1;
-        }
-
-        canvas.set_draw_color(Color::RGB(0, 0, 0));
-        canvas.clear();
-
-        canvas.filled_polygon(&[100, 200, 0], &[0, 0, 100], Color::RGBA(255, 0, 0, 255)).unwrap();
-
-        canvas.present();
-    }
-}
-
-
-#[no_mangle]
-#[allow(non_snake_case)]
-pub extern fn WinMain() -> i32 {
-    main();
-    0
 }

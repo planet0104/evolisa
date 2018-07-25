@@ -1,135 +1,123 @@
-use ::drawing::DnaDrawing;
-use ::point::DnaPoint;
-use ::brush::DnaBrush;
 use rand::rngs::ThreadRng;
 use rand::Rng;
+use sdl2::pixels::Color;
 use std::cmp::{min, max};
 use sdl2::render::Canvas;
 use sdl2::surface::Surface;
 use sdl2::gfx::primitives::DrawRenderer;
+use painter::Params;
 
-use ::{
-    BRUSH_ALPHA_MUTATION_RATE,
-    BRUSH_ALPHA_RANGE_MIN,
-    BRUSH_ALPHA_RANGE_MAX,
-    BRUSH_RED_MUTATION_RATE,
-    BRUSH_RED_RANGE_MIN,
-    BRUSH_RED_RANGE_MAX,
-    BRUSH_GREEN_MUTATION_RATE,
-    BRUSH_GREEN_RANGE_MIN,
-    BRUSH_GREEN_RANGE_MAX,
-    BRUSH_BLUE_MUTATION_RATE,
-    BRUSH_BLUE_RANGE_MIN,
-    BRUSH_BLUE_RANGE_MAX,
-
-    POLYGON_ADD_POINT_MUTATION_RATE,
-    POLYGON_MOVE_POINT_MUTATION_RATE,
-    POLYGON_REMOVE_POINT_MUTATION_RATE,
-    POLYGON_POINTS_PER_POLYGON_MIN,
-    POLYGON_POINTS_PER_POLYGON_MAX,
-
-    DRAWING_POINTS_MIN,
-    DRAWING_POINTS_MAX
-};
-
-pub struct DnaPolygon{
-    brush: DnaBrush,
-    pub points: Vec<DnaPoint>
+pub struct Polygon{
+    vx: Vec<i16>,
+    vy: Vec<i16>,
+    color: Color
 }
 
-impl DnaPolygon{
-    pub fn new() -> DnaPolygon{
-        DnaPolygon{
-            brush: DnaBrush::new(),
-            points: vec![]
+impl Polygon{
+    pub fn new() -> Polygon{
+        Polygon{
+            vx: vec![],
+            vy: vec![],
+            color: Color::RGBA(0, 0, 0, 0)
         }
     }
 
-    pub fn init(&mut self, rng:&mut ThreadRng, width:i32, height:i32){
-        self.brush.color.r = rng.gen_range(BRUSH_RED_RANGE_MIN, BRUSH_RED_RANGE_MAX);
-        self.brush.color.g = rng.gen_range(BRUSH_GREEN_RANGE_MIN, BRUSH_GREEN_RANGE_MAX);
-        self.brush.color.b = rng.gen_range(BRUSH_BLUE_RANGE_MIN, BRUSH_BLUE_RANGE_MAX);
-        self.brush.color.a = rng.gen_range(BRUSH_ALPHA_RANGE_MIN, BRUSH_ALPHA_RANGE_MAX);
+    pub fn init(&mut self, rng: &mut ThreadRng, params: &Params){
+        self.color.r = rng.gen_range(*params.red_range.start(), *params.red_range.end());
+        self.color.g = rng.gen_range(*params.green_range.start(), *params.green_range.end());
+        self.color.b = rng.gen_range(*params.blue_range.start(), *params.blue_range.end());
+        self.color.a = rng.gen_range(*params.alpha_range.start(), *params.alpha_range.end());
 
-        let (origin_x, origin_y) = (rng.gen_range(0, width), rng.gen_range(0, height));
-        for _ in 0..POLYGON_POINTS_PER_POLYGON_MIN{
-            let mut point = DnaPoint::new();
-            point.x = min(max(0, origin_x + rng.gen_range(0, 30)-30), width);
-            point.y = min(max(0, origin_y + rng.gen_range(0, 30)-30), height);
-            self.points.push(point);
+        let (origin_x, origin_y) = (rng.gen_range(0, params.width), rng.gen_range(0, params.height));
+        self.vx.clear();
+        self.vy.clear();
+        for _ in 0..params.vertex_num_range.start{
+            self.vx.push(min(max(0, origin_x + rng.gen_range(0, 30)-30), params.width) as i16);
+            self.vy.push(min(max(0, origin_y + rng.gen_range(0, 30)-30), params.height) as i16);
         }
     }
 
-    pub fn mutate<F: Fn()->i32>(&mut self, total_points: F, rng:&mut ThreadRng) -> bool{
-        let mut dirty = false;
-        if rng.gen_range(0, POLYGON_ADD_POINT_MUTATION_RATE)==1{
-            if self.add_point(total_points, rng){
-                dirty = true;
-            }
-        }
-        if rng.gen_range(0, POLYGON_REMOVE_POINT_MUTATION_RATE)==1{
-            if self.remove_point(total_points, rng){
-                dirty = true;
-            }
-        }
-        if self.brush.mutate(rng){
-            dirty = true;
-        }
-        for point in &mut self.points{
-            if point.mutate(drawing, rng){
-                dirty = true;
-            }
+    pub fn mutate(&mut self, rng: &mut ThreadRng, params: &Params){
+        //添加顶点
+        if rng.gen::<f32>()<params.mutation_rate{
+            self.add_point(rng, params);
         }
 
-        dirty
+        //删除顶点
+        if rng.gen::<f32>()<params.mutation_rate{
+            self.remove_point(rng, params);
+        }
+
+        //颜色变异
+        if rng.gen::<f32>()<params.mutation_rate{
+            self.color.r = rng.gen_range(*params.red_range.start(), *params.red_range.end());
+        }
+
+        if rng.gen::<f32>()<params.mutation_rate{
+            self.color.g = rng.gen_range(*params.green_range.start(), *params.green_range.end());
+        }
+
+        if rng.gen::<f32>()<params.mutation_rate{
+            self.color.b = rng.gen_range(*params.blue_range.start(), *params.blue_range.end());
+        }
+
+        if rng.gen::<f32>()<params.mutation_rate{
+            self.color.a = rng.gen_range(*params.alpha_range.start(), *params.alpha_range.end());
+        }
+
+        //顶点变异
+        for i in 0..self.vx.len(){
+            //选择移动范围
+            let move_range = if rng.gen::<f32>()<params.mutation_rate{
+                Some(params.vertex_move_range[2])
+            }else if rng.gen::<f32>()<params.mutation_rate{
+                Some(params.vertex_move_range[1])
+            }else if rng.gen::<f32>()<params.mutation_rate{
+                Some(params.vertex_move_range[0])
+            }else{
+                None
+            };
+
+            if let Some(move_range) = move_range{
+                self.vx[i] = min(max(0, self.vx[i] + (rng.gen_range(0, move_range*2)-move_range)), params.width);
+                self.vy[i] = min(max(0, self.vy[i] + (rng.gen_range(0, move_range*2)-move_range)), params.height);
+            }
+        }
     }
 
-    pub fn add_point<F: Fn()->i32>(&mut self, total_points: F, rng:&mut ThreadRng) -> bool{
-        let mut dirty = false;
-        if self.points.len() < POLYGON_POINTS_PER_POLYGON_MAX as usize{
-            if total_points() < DRAWING_POINTS_MAX{
-                let mut new_point = DnaPoint::new();
-                let index = rng.gen_range(1, self.points.len()-1);
+    pub fn add_point(&mut self, rng: &mut ThreadRng, params: &Params){
+        if self.vx.len() < params.vertex_num_range.end{
+            //随机选择一个位置增加点
+            let index = rng.gen_range(1, self.vx.len()-1);
 
-                {
-                    let prev = &self.points[index-1];
-                    let next = &self.points[index];
-
-                    new_point.x = (prev.x + next.x)/2;
-                    new_point.y = (prev.y + next.y)/2;
-                }
-
-                self.points.insert(index, new_point);
-                dirty = true;
-            }
+            let (prev_x, prev_y) = (self.vx[index-1], self.vy[index-1]);
+            let (next_x, next_y) = (self.vx[index], self.vy[index]);
+            //在中间插入一个点
+            self.vx.insert(index, (prev_x-next_x)/2);
+            self.vy.insert(index, (prev_y-next_y)/2);
         }
-        dirty
     }
 
-    pub fn remove_point<F: Fn()->i32>(&mut self, total_points: F, rng:&mut ThreadRng) -> bool{
-        let mut dirty = false;
-        if self.points.len() > POLYGON_POINTS_PER_POLYGON_MIN as usize{
-            if total_points() > DRAWING_POINTS_MIN{
-                let index = rng.gen_range(0, self.points.len());
-                self.points.remove(index);
-                dirty = true;
-            }
+    pub fn remove_point(&mut self, rng: &mut ThreadRng, params: &Params){
+        if self.vx.len() > params.vertex_num_range.start{
+            let index = rng.gen_range(0, self.vx.len());
+            self.vx.remove(index);
+            self.vy.remove(index);
         }
-        dirty
     }
 
-    pub fn render(&self, canvas: Canvas<Surface>) -> Result<(), String>{
-        let vx:Vec<i16> = self.points.iter().map(|point|{ point.x as i16 }).collect();
-        let vy:Vec<i16> = self.points.iter().map(|point|{ point.y as i16 }).collect();
-        canvas.filled_polygon(vx.as_slice(), vy.as_slice(), self.brush.color)
+    pub fn render(&self, canvas: &mut Canvas<Surface>) -> Result<(), String>{
+        canvas.set_draw_color(self.color);
+        canvas.filled_polygon(&self.vx, &self.vy, self.color)
     }
 }
 
-impl Clone for DnaPolygon{
-    fn clone(&self) -> DnaPolygon{
-        DnaPolygon{
-            brush: self.brush.clone(),
-            points: self.points.clone()
+impl Clone for Polygon{
+    fn clone(&self) -> Polygon{
+        Polygon{
+            vx: self.vx.clone(),
+            vy: self.vy.clone(),
+            color: self.color
         }
     }
 }
