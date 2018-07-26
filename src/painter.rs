@@ -6,7 +6,9 @@ use sdl2::surface::Surface;
 use sdl2::rect::Rect;
 use sdl2::pixels::PixelFormatEnum;
 use image;
-use image::DynamicImage;
+use sdl2::render::Canvas;
+use std::time::Instant;
+use ::duration_to_milis;
 
 /*
 参数:
@@ -28,7 +30,7 @@ pub struct Params{
     pub num_copies_elite: usize,
     pub polygons_num: usize, //多边形数量
     pub vertex_num_range: ::std::ops::Range<usize>, //多边形顶点数量 3~10
-    pub mutation_rate: f32, //变异率 0.007
+    pub mutation_rate: f32, //变异率 0.07
     pub crossover_rate: f32, //杂交率 0.7
     pub vertex_move_range: [i16; 3], //顶点移动范围类型(值越小的概率越高) [0~200; 0~20; 0~3]
     pub alpha_range: ::std::ops::RangeInclusive<u8>, //颜色取值范围
@@ -70,7 +72,7 @@ impl Painter{
         }
     }
 
-    pub fn epoch(&mut self){
+    pub fn epoch(&mut self, canvas: &mut Canvas<Surface>){
 
         //计算总适应分
         self.total_fitness = 0.0;
@@ -86,21 +88,24 @@ impl Painter{
         self.grab_n_best(self.params.num_elite, self.params.num_copies_elite, &mut new_pop);
 
         while new_pop.len() < self.drawings.len(){
-            println!(">>>len={}", new_pop.len());
+
             let (id1, id2) = (self.get_chromo_roulette(), self.get_chromo_roulette());
             //杂交
             let (mut baby1, mut baby2) = Painter::crossover(self.params.crossover_rate, &self.drawings[id1], &self.drawings[id2], &mut self.rng);
             //变异
             baby1.mutate(&mut self.rng, &self.params);
-            baby1.mutate(&mut self.rng, &self.params);
+            baby2.mutate(&mut self.rng, &self.params);
 
             //计算适应分
-            baby1.fitness = self.calculate_fitness(&baby1);
-            baby2.fitness = self.calculate_fitness(&baby2);
+            baby1.fitness = self.calculate_fitness(canvas, &baby1);
+            baby2.fitness = self.calculate_fitness(canvas, &baby2);
 
             new_pop.push(baby1);
             new_pop.push(baby2);
         }
+
+        self.drawings.clear();
+        self.drawings.append(&mut new_pop);
 
         self.generation += 1;
     }
@@ -112,6 +117,10 @@ impl Painter{
                 pop.push(self.drawings[i].clone());
             }
         }
+    }
+
+    pub fn generation(&self) -> usize{
+        self.generation
     }
 
     //赌轮选择
@@ -156,14 +165,32 @@ impl Painter{
         })
     }
 
-    pub fn calculate_fitness(&mut self, drawing:&Drawing) -> f64{
+    pub fn render_drawing(&self, canvas: &mut Canvas<Surface>, drawing:&Drawing){
         let (width, height) = (self.params.width as u32, self.params.height as u32);
-        let surface = Surface::new(width, height, PixelFormatEnum::RGB24).unwrap();
-        let mut canvas = surface.into_canvas().unwrap();
-        drawing.render(&mut canvas).unwrap();
+
+        let texture_creator = canvas.texture_creator();
+        let mut texture = texture_creator
+            .create_texture_target(texture_creator.default_pixel_format(), width, height)
+            .unwrap();
+        canvas.with_texture_canvas(&mut texture, |mut texture_canvas| {
+            drawing.render(&mut texture_canvas).unwrap();
+        }).unwrap();
+        canvas.copy(&texture, None, None).expect("Render failed");
         canvas.present();
+    }
+
+    pub fn calculate_fitness(&mut self, canvas: &mut Canvas<Surface>, drawing:&Drawing) -> f64{
+
+        //let start_time = Instant::now();
+
+        let (width, height) = (self.params.width as u32, self.params.height as u32);
+        self.render_drawing(canvas, drawing);
         let drawing_pixels = canvas.read_pixels(Rect::new(0, 0, width, height), PixelFormatEnum::RGB24).unwrap();
+
+        //println!("render耗时:{}ms", duration_to_milis(&start_time.elapsed()));
         
+        //let start_time = Instant::now();
+
         let mut error = 0.0;
         
         let mut i = 0;
@@ -181,7 +208,13 @@ impl Painter{
             error += e;
             i += 4;
         }
+
+        //println!("计算 error 耗时:{}ms", duration_to_milis(&start_time.elapsed()));
         
-        error
+        2_601_000_000.0 - error
+    }
+
+    pub fn drawings(&self) -> &Vec<Drawing>{
+        &self.drawings
     }
 }

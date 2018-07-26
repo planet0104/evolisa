@@ -3,14 +3,14 @@ use rand::Rng;
 use sdl2::pixels::Color;
 use std::cmp::{min, max};
 use sdl2::render::Canvas;
-use sdl2::surface::Surface;
 use sdl2::gfx::primitives::DrawRenderer;
 use painter::Params;
+use sdl2::render::RenderTarget;
 
 pub struct Polygon{
-    vx: Vec<i16>,
-    vy: Vec<i16>,
-    color: Color
+    pub vx: Vec<i16>,
+    pub vy: Vec<i16>,
+    pub color: Color
 }
 
 impl Polygon{
@@ -106,7 +106,7 @@ impl Polygon{
         }
     }
 
-    pub fn render(&self, canvas: &mut Canvas<Surface>) -> Result<(), String>{
+    pub fn render<T: RenderTarget>(&self, canvas: &mut Canvas<T>) -> Result<(), String>{
         canvas.set_draw_color(self.color);
         canvas.filled_polygon(&self.vx, &self.vy, self.color)
     }

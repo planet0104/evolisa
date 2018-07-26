@@ -3,8 +3,8 @@ use painter::Params;
 use rand::rngs::ThreadRng;
 use sdl2::pixels::Color;
 use sdl2::render::Canvas;
-use sdl2::surface::Surface;
 use sdl2::rect::Rect;
+use sdl2::render::RenderTarget;
 
 pub struct Drawing{
     pub fitness: f64,
@@ -31,10 +31,10 @@ impl Drawing{
         }
     }
 
-    pub fn render(&self, canvas: &mut Canvas<Surface>) -> Result<(), String>{
+    pub fn render<T: RenderTarget>(&self, canvas: &mut Canvas<T>) -> Result<(), String>{
         //填充白色背景
         let size = canvas.output_size().unwrap();
-        canvas.set_draw_color(Color::RGB(255, 255, 255));
+        canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.fill_rect(Rect::new(0, 0, size.0, size.1)).unwrap();
 
         for polygon in &self.polygons{
