@@ -1,10 +1,9 @@
 use polygon::Polygon;
 use painter::Params;
 use rand::rngs::ThreadRng;
-use sdl2::pixels::Color;
-use sdl2::render::Canvas;
-use sdl2::rect::Rect;
-use sdl2::render::RenderTarget;
+use image::{RgbaImage, Rgba};
+use imageproc::drawing::draw_filled_rect_mut;
+use imageproc::rect::Rect;
 
 pub struct Drawing{
     pub fitness: f64,
@@ -31,19 +30,14 @@ impl Drawing{
         }
     }
 
-    pub fn render<T: RenderTarget>(&self, canvas: &mut Canvas<T>) -> Result<(), String>{
-        //填充白色背景
-        let size = canvas.output_size().unwrap();
-        canvas.set_draw_color(Color::RGB(0, 0, 0));
-        canvas.fill_rect(Rect::new(0, 0, size.0, size.1)).unwrap();
+    pub fn render(&self, image: &mut RgbaImage){
+        //填充黑色背景
+        let (width, height) = (image.width(), image.height());
+        draw_filled_rect_mut(image, Rect::at(0, 0).of_size(width, height), Rgba([0u8, 0u8, 0u8, 255u8]));
 
         for polygon in &self.polygons{
-            let r = polygon.render(canvas);
-            if r.is_err(){
-                return r;
-            }
+            polygon.render(image);
         }
-        Ok(())
     }
 }
 

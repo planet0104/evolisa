@@ -5,6 +5,7 @@ extern crate image;
 extern crate imageproc;
 extern crate gl;
 extern crate glfw;
+use std::mem::size_of;
 
 use glfw::{Action, Context, Key};
 
@@ -97,21 +98,100 @@ fn main(){
     let mut painter = Painter::new(20, "girl.png", params);
     let mut image = RgbaImage::new(120, 145);
 
-    for g in 0..10000{
-        painter.epoch(&mut image);
-        if g%100 == 0{
-            let drawings = painter.drawings();
-            println!("代数:{} 最高分:{} 最低分:{}", painter.generation(), drawings[0].fitness, drawings[drawings.len()-1].fitness);
-        }
-    }
+    // for g in 0..10000{
+    //     painter.epoch(&mut image);
+    //     if g%100 == 0{
+    //         let drawings = painter.drawings();
+    //         println!("代数:{} 最高分:{} 最低分:{}", painter.generation(), drawings[0].fitness, drawings[drawings.len()-1].fitness);
+    //     }
+    // }
 
     //填充黑色背景
-    // let (width, height) = (image.width(), image.height());
-    // draw_filled_rect_mut(&mut image, Rect2::at(0, 0).of_size(width, height), Rgba([0u8, 0u8, 0u8, 255u8]));
-    // let poly = [Point::new(10, 43), Point::new(100, 104), Point::new(10, 142)];
-    // draw_convex_polygon_mut(&mut image, &poly, Rgba([255, 255, 255, 50]));
+    let (width, height) = (image.width(), image.height());
+    draw_filled_rect_mut(&mut image, Rect2::at(0, 0).of_size(width, height), Rgba([0u8, 0u8, 0u8, 255u8]));
+    let poly = [Point::new(10, 43), Point::new(100, 104), Point::new(10, 142)];
+    draw_convex_polygon_mut(&mut image, &poly, Rgba([255, 255, 255, 50]));
 
     image.save("ok.png").unwrap();
+
+    let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
+
+    let (mut window, events) = glfw.create_window(300, 300, "Hello this is window", glfw::WindowMode::Windowed)
+        .expect("Failed to create GLFW window.");
+
+    gl::load_with(|s| window.get_proc_address(s) as *const std::os::raw::c_void);
+
+    unsafe{
+        let width = 200;
+        let height = 200;
+        let mut fbo:GLuint = 0;
+        let mut rboColor:GLuint = 0;
+        let mut rboDepth:GLuint = 0;
+ 
+        // Color renderbuffer.
+        gl::GenRenderbuffers(1, &mut rboColor);
+        gl::BindRenderbuffer(gl::RENDERBUFFER, rboColor);
+
+        // Set storage for currently bound renderbuffer.
+        gl::RenderbufferStorage(gl::RENDERBUFFER, gl::RGBA8, width, height);
+
+        // Depth renderbuffer
+        gl::GenRenderbuffers(1, &mut rboDepth);
+        gl::BindRenderbuffer(gl::RENDERBUFFER, rboDepth);
+        gl::RenderbufferStorage(gl::RENDERBUFFER, gl::DEPTH_COMPONENT24, width, height);
+
+        // Framebuffer
+        gl::GenFramebuffers(1, &mut fbo);
+        gl::BindFramebuffer(gl::FRAMEBUFFER,fbo);
+        gl::FramebufferRenderbuffer(gl::DRAW_FRAMEBUFFER, gl::COLOR_ATTACHMENT0, gl::RENDERBUFFER, rboColor);
+        // Set renderbuffers for currently bound framebuffer
+        gl::FramebufferRenderbuffer(gl::DRAW_FRAMEBUFFER, gl::DEPTH_ATTACHMENT, gl::RENDERBUFFER, rboDepth);
+    
+        // Set to write to the framebuffer.
+        gl::BindFramebuffer(gl::FRAMEBUFFER, fbo);
+    
+        // Tell glReadPixels where to read from.
+        gl::ReadBuffer(gl::COLOR_ATTACHMENT0);
+
+
+        gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+        
+
+        //---------------------------------------------------------------------------
+        //https://blog.csdn.net/wangdingqiaoit/article/details/51318793
+
+        //Step1: 创建VBO
+        let mut vbo_id:GLuint = 0;
+        gl::GenBuffers(1, &mut vbo_id);
+
+        //Step2: 将顶点数据传送到VBO或者为VBO预分配空间。 
+        let vertices:[GLfloat; 9] = [
+            -0.5f32, 0.0f32, 0.0f32,
+            0.5f32, 0.0f32, 0.0f32,
+            0.0f32, 0.5f32, 0.0f32
+        ];
+        //将数据传送到GPU中需要通过函数glBufferData实现
+        gl::BindBuffer(gl::ARRAY_BUFFER, vbo_id);
+        gl::BufferData(gl::ARRAY_BUFFER, vertices.len() as isize, vertices.as_ptr() as *const std::os::raw::c_void, gl::STATIC_DRAW);
+
+        //Step3: 通知OpenGL如何解释这个顶点属性数组
+        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 12, 0 as *const std::os::raw::c_void);
+        gl::EnableVertexAttribArray(0);
+
+        //解除绑定
+        gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+        gl::BindVertexArray(0);
+
+        //---------------------------绘制
+        gl::BindVertexArray(vbo_id); // 使用VAO信息
+        gl::UseProgram(shaderProgramId); // 使用着色器
+        gl::DrawArrays(gl::TRIANGLES, 0, 3);
+        
+
+        gl::Flush();
+
+        println!("OK. rboColor={}", rboColor);       
+    }
 
     //painter.epoch(&mut canvas);
 

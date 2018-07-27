@@ -2,13 +2,7 @@ use drawing::Drawing;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use rand::thread_rng;
-use sdl2::surface::Surface;
-use sdl2::rect::Rect;
-use sdl2::pixels::PixelFormatEnum;
-use image;
-use sdl2::render::Canvas;
-use std::time::Instant;
-use ::duration_to_milis;
+use image::{open, RgbaImage};
 
 /*
 参数:
@@ -24,15 +18,15 @@ Blue取值范围 0~255
 
 //参数
 pub struct Params{
-    pub width: i16,
-    pub height: i16,
+    pub width: i32,
+    pub height: i32,
     pub num_elite: usize,
     pub num_copies_elite: usize,
     pub polygons_num: usize, //多边形数量
     pub vertex_num_range: ::std::ops::Range<usize>, //多边形顶点数量 3~10
     pub mutation_rate: f32, //变异率 0.07
     pub crossover_rate: f32, //杂交率 0.7
-    pub vertex_move_range: [i16; 3], //顶点移动范围类型(值越小的概率越高) [0~200; 0~20; 0~3]
+    pub vertex_move_range: [i32; 3], //顶点移动范围类型(值越小的概率越高) [0~200; 0~20; 0~3]
     pub alpha_range: ::std::ops::RangeInclusive<u8>, //颜色取值范围
     pub red_range: ::std::ops::RangeInclusive<u8>,
     pub green_range: ::std::ops::RangeInclusive<u8>,
@@ -40,7 +34,7 @@ pub struct Params{
 }
 
 pub struct Painter{
-    target_pixels: Vec<u8>,
+    target: RgbaImage,
     params: Params,
     drawings: Vec<Drawing>,
     generation: usize,
@@ -61,10 +55,10 @@ impl Painter{
         }
 
         //读取目标图片像素
-        let img = image::open(target_file).unwrap();
+        let img = open(target_file).unwrap();
         Painter{
             rng,
-            target_pixels: img.raw_pixels(),
+            target: img.to_rgba(),
             generation: 0,
             drawings,
             params,
@@ -72,7 +66,7 @@ impl Painter{
         }
     }
 
-    pub fn epoch(&mut self, canvas: &mut Canvas<Surface>){
+    pub fn epoch(&mut self, image: &mut RgbaImage){
 
         //计算总适应分
         self.total_fitness = 0.0;
@@ -97,8 +91,8 @@ impl Painter{
             baby2.mutate(&mut self.rng, &self.params);
 
             //计算适应分
-            baby1.fitness = self.calculate_fitness(canvas, &baby1);
-            baby2.fitness = self.calculate_fitness(canvas, &baby2);
+            baby1.fitness = self.calculate_fitness(image, &baby1);
+            baby2.fitness = self.calculate_fitness(image, &baby2);
 
             new_pop.push(baby1);
             new_pop.push(baby2);
@@ -165,51 +159,28 @@ impl Painter{
         })
     }
 
-    pub fn render_drawing(&self, canvas: &mut Canvas<Surface>, drawing:&Drawing){
-        let (width, height) = (self.params.width as u32, self.params.height as u32);
-
-        let texture_creator = canvas.texture_creator();
-        let mut texture = texture_creator
-            .create_texture_target(texture_creator.default_pixel_format(), width, height)
-            .unwrap();
-        canvas.with_texture_canvas(&mut texture, |mut texture_canvas| {
-            drawing.render(&mut texture_canvas).unwrap();
-        }).unwrap();
-        canvas.copy(&texture, None, None).expect("Render failed");
-        canvas.present();
+    pub fn render_drawing(&self, image: &mut RgbaImage, drawing:&Drawing){
+        drawing.render(image);
     }
 
-    pub fn calculate_fitness(&mut self, canvas: &mut Canvas<Surface>, drawing:&Drawing) -> f64{
-
-        //let start_time = Instant::now();
-
-        let (width, height) = (self.params.width as u32, self.params.height as u32);
-        self.render_drawing(canvas, drawing);
-        let drawing_pixels = canvas.read_pixels(Rect::new(0, 0, width, height), PixelFormatEnum::RGB24).unwrap();
-
-        //println!("render耗时:{}ms", duration_to_milis(&start_time.elapsed()));
-        
-        //let start_time = Instant::now();
+    pub fn calculate_fitness(&mut self, image: &mut RgbaImage, drawing:&Drawing) -> f64{
+        self.render_drawing(image, drawing);
 
         let mut error = 0.0;
-        
-        let mut i = 0;
-        while i<drawing_pixels.len(){        
-            let r = self.target_pixels[i] as f64 - drawing_pixels[i] as f64;
-            let g = self.target_pixels[i+1] as f64 - drawing_pixels[i+1] as f64;
-            let b = self.target_pixels[i+2] as f64 - drawing_pixels[i+2] as f64;
-            let a = self.target_pixels[i+3] as f64 - drawing_pixels[i+3] as f64;
-            let e = r*r + g*g + b*b + a*a;
 
-            //Alternative error functions
-            //e = sqrt(r*r + g*g + b*b + a*a);
-            //e = abs(r) + abs(g) + abs(b) + abs(a);
-
+        let mut test_pixels = image.pixels();
+        let mut target_pixels = self.target.pixels();
+        while let Some(pixel) = test_pixels.next(){
+            let target_pixel = target_pixels.next().unwrap();
+            //获取每隔颜色的差值
+            let dr = target_pixel[0] as f64 - pixel[0] as f64;
+            let dg = target_pixel[1] as f64 - pixel[1] as f64;
+            let db = target_pixel[2] as f64 - pixel[2] as f64;
+            let da = target_pixel[3] as f64 - pixel[3] as f64;
+            //计算颜色之间的3D空间距离
+            let e = dr * dr + dg * dg + db * db + da * da;
             error += e;
-            i += 4;
         }
-
-        //println!("计算 error 耗时:{}ms", duration_to_milis(&start_time.elapsed()));
         
         2_601_000_000.0 - error
     }
